@@ -1,0 +1,29 @@
+{
+  "name": "max-migrate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "migrate": "tsx src/cli.ts",
+    "migrate:upload": "tsx src/cli.ts upload",
+    "migrate:post": "tsx src/cli.ts post",
+    "migrate:reattach": "tsx src/cli.ts reattach",
+    "migrate:sync-mids": "tsx src/cli.ts sync-mids",
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "cli-progress": "^3.12.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

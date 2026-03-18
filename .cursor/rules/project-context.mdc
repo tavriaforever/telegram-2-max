@@ -1,0 +1,40 @@
+---
+description: Базовый контекст проекта — миграция Telegram → Max
+alwaysApply: true
+---
+
+# Проект max-migrate
+
+Модуль для **миграции бота из Telegram в мессенджер Max**.
+
+## Стек
+
+- **Язык:** TypeScript
+- **Среда:** Node.js 22
+- **Библиотека Max:** `@maxhub/max-bot-api` (официальный клиент)
+  - Репозиторий: https://github.com/max-messenger/max-bot-api-client-ts
+  - Установка: `npm install @maxhub/max-bot-api`
+
+## Документация
+
+- **Документация Max для ботов (JS/TS):** https://dev.max.ru/docs/chatbots/bots-coding/library/js
+- **Актуальная документация мессенджера Max в Context7:** https://context7.com/websites/dev_max_ru — **использовать при вопросах по API Max** (подключать через @Docs или context7).
+
+## Базовый паттерн Max Bot API
+
+```typescript
+import { Bot } from '@maxhub/max-bot-api';
+
+const bot = new Bot(process.env.BOT_TOKEN);
+
+bot.command('start', (ctx) => ctx.reply('Добро пожаловать!'));
+bot.on('message_created', (ctx) => ctx.reply(ctx.message.body.text));
+
+bot.start();
+```
+
+События: `bot_started`, `message_created`, `message_edited`, `message_removed`, `bot_added`, `bot_removed`, `user_added`, `user_removed`, `chat_title_changed`, `message_callback`. Отправка: `ctx.reply()`, `bot.api.sendMessageToUser()`, `bot.api.sendMessageToChat()`. Для методов без обёртки — `ctx.api.raw.get/post/put/patch/delete`.
+
+## Задачи проекта
+
+При переносе логики с Telegram на Max учитывать отличия API (события, типы сообщений, вложения, клавиатуры). Сверяться с документацией Max в Context7 и dev.max.ru.
