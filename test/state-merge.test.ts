@@ -17,6 +17,7 @@ describe("migration state", () => {
     expect(state.messages["3"]!.upload.image?.relativePath).toMatch(/photo/);
     expect(state.messages["7"]!.upload.video).toBeDefined();
     expect(state.messages["12"]!.expectedMedia).toEqual({});
+    expect(state.messages["3"]!.author).toContain("Ассоциация");
   });
 
   it("сохраняет успешную загрузку при повторном merge", async () => {

@@ -1,4 +1,5 @@
-import { entitiesToMarkdown, formatPostBody } from "../markdown/entities-to-markdown.js";
+import { messageToPostText } from "../markdown/entities-to-markdown.js";
+import { loadTelegramDump } from "../sources/telegram-dump.js";
 import {
   defaultStatePath,
   loadMigrationState,
@@ -82,8 +83,38 @@ async function sendWithRetries(
 
   try {
     return await trySend();
-  } catch (e1) {
-    if (MaxMessagesClient.isAttachmentNotReady(e1)) {
+  } catch (firstErr) {
+    let err: unknown = firstErr;
+
+    if (MaxMessagesClient.isTooManyChatRequests(err)) {
+      const rateWaits = [35_000, 60_000, 90_000, 120_000];
+      let attachmentAfter429: unknown | undefined;
+      for (const ms of rateWaits) {
+        console.warn(
+          `  Лимит отправки в чат (429), пауза ${ms / 1000} с и повтор…`,
+        );
+        await sleep(ms);
+        try {
+          return await trySend();
+        } catch (e2) {
+          if (MaxMessagesClient.isTooManyChatRequests(e2)) {
+            continue;
+          }
+          if (MaxMessagesClient.isAttachmentNotReady(e2)) {
+            attachmentAfter429 = e2;
+            break;
+          }
+          throw e2;
+        }
+      }
+      if (attachmentAfter429 != null) {
+        err = attachmentAfter429;
+      } else if (MaxMessagesClient.isTooManyChatRequests(err)) {
+        throw err;
+      }
+    }
+
+    if (MaxMessagesClient.isAttachmentNotReady(err)) {
       const backoff = [2000, 4000, 8000, 16000, 32000];
       for (const ms of backoff) {
         console.warn(`  Вложение не готово (attachment.not.ready), ждём ${ms / 1000} с…`);
@@ -96,7 +127,7 @@ async function sendWithRetries(
           }
         }
       }
-      throw e1;
+      throw err;
     }
 
     console.warn("  Ошибка отправки, повтор через 1.5 с…");
@@ -114,6 +145,8 @@ export interface PostCmdOptions {
   dry?: boolean;
   /** Только эти id сообщений из дампа (точечная публикация) */
   onlyMessageIds?: Set<number>;
+  /** Заголовок «Имя · дата время» из дампа (группы / чаты) */
+  chatAuthorMode?: boolean;
 }
 
 export async function runPost(opts: PostCmdOptions): Promise<void> {
@@ -121,6 +154,15 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
   const state = await loadMigrationState(statePath);
   if (!state) {
     throw new Error(`Нет файла состояния: ${statePath}. Сначала выполните upload.`);
+  }
+
+  let authorById: Map<number, string> | undefined;
+  if (opts.chatAuthorMode) {
+    const { messages } = await loadTelegramDump(opts.dumpDir);
+    authorById = new Map();
+    for (const m of messages) {
+      if (m.author) authorById.set(m.id, m.author);
+    }
   }
 
   const ids = Object.keys(state.messages)
@@ -144,8 +186,7 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
       if (entry.messagePosted) continue;
       if (opts.skipIfMediaMissing && mediaMissing(entry)) continue;
       wouldPost++;
-      const md = entitiesToMarkdown(entry.text_entities);
-      const text = formatPostBody(entry.date, md);
+      const text = messageToPostText(entry, id, !!opts.chatAuthorMode, authorById);
       const dryAttachments = buildAttachmentsForDryPreview(id, entry);
 
       const body: Record<string, unknown> = { text };
@@ -200,8 +241,7 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
       continue;
     }
 
-    const md = entitiesToMarkdown(entry.text_entities);
-    const text = formatPostBody(entry.date, md);
+    const text = messageToPostText(entry, id, !!opts.chatAuthorMode, authorById);
     const attachments = buildAttachments(entry);
 
     console.log(`Публикация сообщения id=${id}…`);

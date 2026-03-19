@@ -1,4 +1,5 @@
-import { entitiesToMarkdown, formatPostBody } from "../markdown/entities-to-markdown.js";
+import { messageToPostText } from "../markdown/entities-to-markdown.js";
+import { loadTelegramDump } from "../sources/telegram-dump.js";
 import {
   defaultStatePath,
   loadMigrationState,
@@ -38,8 +39,16 @@ function wordOverlapRatio(a: string, b: string): number {
   return hit / wa.size;
 }
 
-function expectedText(entry: MessageMigrationState): string {
-  return formatPostBody(entry.date, entitiesToMarkdown(entry.text_entities));
+function dateFilterSubstring(expectedFullText: string): string {
+  const classic = expectedFullText.match(/Дата публикации:\s*(\d{1,2}\.\d{1,2}\.\d{4})/i);
+  if (classic) {
+    return `дата публикации: ${classic[1]}`.toLowerCase();
+  }
+  const authorLine = expectedFullText.match(/·\s*(\d{1,2}\.\d{1,2}\.\d{4})\s+\d{1,2}:\d{1,2}/);
+  if (authorLine) {
+    return authorLine[1].toLowerCase();
+  }
+  return "";
 }
 
 export interface SyncMidsOptions {
@@ -52,6 +61,8 @@ export interface SyncMidsOptions {
   force?: boolean;
   dry?: boolean;
   maxPages?: number;
+  /** Должен совпадать с тем, как делали post (заголовок с автором) */
+  chatAuthorMode?: boolean;
 }
 
 /**
@@ -62,6 +73,15 @@ export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
   const statePath = opts.statePath ?? defaultStatePath(opts.dumpDir);
   const state = await loadMigrationState(statePath);
   if (!state) throw new Error(`Нет state: ${statePath}`);
+
+  let authorById: Map<number, string> | undefined;
+  if (opts.chatAuthorMode) {
+    const { messages } = await loadTelegramDump(opts.dumpDir);
+    authorById = new Map();
+    for (const m of messages) {
+      if (m.author) authorById.set(m.id, m.author);
+    }
+  }
 
   console.log("Загрузка сообщений чата через GET /messages…");
   const chatRows = await fetchAllChatMessages(opts.token, opts.chatId, {
@@ -99,15 +119,14 @@ export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
       continue;
     }
 
-    const exp = expectedText(entry);
+    const exp = messageToPostText(entry, dumpId, !!opts.chatAuthorMode, authorById);
     const expS = simplify(exp);
     if (expS.length < 15) {
       console.warn(`#${dumpId} слишком короткий текст — пропуск сопоставления`);
       continue;
     }
 
-    const dm = exp.match(/Дата публикации:\s*(\d{1,2}\.\d{1,2}\.\d{4})/i);
-    const dateKey = dm ? `дата публикации: ${dm[1]}`.toLowerCase() : "";
+    const dateKey = dateFilterSubstring(exp);
     const pool =
       dateKey.length > 0
         ? candidates.filter((c) => c.simple.includes(dateKey))

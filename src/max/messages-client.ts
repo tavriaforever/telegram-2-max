@@ -1,4 +1,4 @@
-import { MAX_PLATFORM_API, MAX_RPS_DELAY_MS } from "./constants.js";
+import { getPostMessageDelayMs, MAX_PLATFORM_API, MAX_RPS_DELAY_MS } from "./constants.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -100,6 +100,9 @@ export interface SendMessageOptions {
 }
 
 export class MaxMessagesClient {
+  /** Время последнего успешного POST /messages (для интервала между сообщениями в чат) */
+  private lastChatSendOkAt = 0;
+
   constructor(
     private readonly token: string,
     private readonly onRequest?: () => void,
@@ -109,10 +112,20 @@ export class MaxMessagesClient {
     await sleep(MAX_RPS_DELAY_MS);
   }
 
+  private async throttleBeforeChatSend(): Promise<void> {
+    const gap = getPostMessageDelayMs();
+    if (this.lastChatSendOkAt > 0) {
+      const wait = gap - (Date.now() - this.lastChatSendOkAt);
+      if (wait > 0) {
+        await sleep(wait);
+      }
+    }
+  }
+
   async sendMessage(
     opts: SendMessageOptions,
   ): Promise<{ parsed: Record<string, unknown>; rawText: string }> {
-    await this.throttle();
+    await this.throttleBeforeChatSend();
     this.onRequest?.();
 
     const url = new URL(`${MAX_PLATFORM_API}/messages`);
@@ -143,6 +156,8 @@ export class MaxMessagesClient {
       err.body = rawText;
       throw err;
     }
+
+    this.lastChatSendOkAt = Date.now();
 
     let parsed: Record<string, unknown> = {};
     try {
@@ -215,6 +230,23 @@ export class MaxMessagesClient {
     if (err && typeof err === "object" && "body" in err) {
       const b = String((err as { body: string }).body);
       return b.includes("attachment.not.ready") || b.includes("file.not.processed");
+    }
+    return false;
+  }
+
+  /** 429 / слишком частая отправка в чат */
+  static isTooManyChatRequests(err: unknown): boolean {
+    if (err && typeof err === "object" && "status" in err) {
+      const status = (err as { status: number }).status;
+      if (status === 429) return true;
+    }
+    if (err && typeof err === "object" && "body" in err) {
+      const b = String((err as { body: string }).body).toLowerCase();
+      return (
+        b.includes("too.many.requests") ||
+        b.includes("too-many-chat-messages") ||
+        b.includes("too_many")
+      );
     }
     return false;
   }

@@ -12,6 +12,8 @@ export interface TelegramDumpMessage {
   type: string;
   date: string;
   date_unixtime?: string;
+  /** Имя отправителя (личные чаты / группы / канал как автор) */
+  from?: string;
   text_entities?: TextEntity[];
   photo?: string;
   file?: string;
@@ -30,6 +32,8 @@ export interface NormalizedMessage {
   date: string;
   text_entities: TextEntity[];
   attachments: NormalizedAttachment[];
+  /** Из поля from дампа */
+  author?: string;
 }
 
 export type UploadSlotStatus = "pending" | "ok" | "error";
@@ -45,6 +49,8 @@ export interface UploadSlotState {
 export interface MessageMigrationState {
   date: string;
   text_entities: TextEntity[];
+  /** Имя автора из дампа (для --chat-author-mode) */
+  author?: string;
   expectedMedia: Partial<Record<MediaKind, { relativePath: string }>>;
   upload: Partial<Record<MediaKind, UploadSlotState>>;
   messagePosted: boolean;

@@ -3,6 +3,7 @@ import {
   entitiesToMarkdown,
   escapeMarkdownPlain,
   formatPostBody,
+  messageToPostText,
 } from "../src/markdown/entities-to-markdown.js";
 import type { TextEntity } from "../src/types.js";
 
@@ -52,5 +53,38 @@ describe("formatPostBody", () => {
     const s = formatPostBody("2024-11-22T14:39:07", "**x**");
     expect(s.startsWith("Дата публикации: 22.11.2024")).toBe(true);
     expect(s).toContain("**x**");
+  });
+
+  it("chatAuthorMode: имя и дата-время", () => {
+    const s = formatPostBody("2024-09-09T20:49:58", "привет", {
+      chatAuthorMode: true,
+      author: "Nick",
+    });
+    expect(s.startsWith("Nick · 09.09.2024 20:49")).toBe(true);
+    expect(s).toContain("привет");
+  });
+
+  it("chatAuthorMode без автора — как канал", () => {
+    const s = formatPostBody("2024-11-22T14:39:07", "x", {
+      chatAuthorMode: true,
+    });
+    expect(s.startsWith("Дата публикации:")).toBe(true);
+  });
+});
+
+describe("messageToPostText", () => {
+  it("берёт автора из entry или из карты", () => {
+    const entry = {
+      date: "2024-01-01T12:00:00",
+      text_entities: [{ type: "plain" as const, text: "hi" }],
+      expectedMedia: {},
+      upload: {},
+      messagePosted: false,
+      author: "Анна",
+    };
+    expect(messageToPostText(entry, 1, true, undefined)).toMatch(/^Анна · 01\.01\.2024 12:00/);
+    const noAuthor = { ...entry, author: undefined };
+    const map = new Map<number, string>([[5, "Борис"]]);
+    expect(messageToPostText(noAuthor, 5, true, map)).toMatch(/^Борис ·/);
   });
 });

@@ -69,6 +69,10 @@ program
   )
   .option("--force", "Повторить reattach даже если уже помечено attachmentsApplied")
   .option("--dry", "Показать тела PUT без вызова API")
+  .option(
+    "--chat-author-mode",
+    "Тот же заголовок текста, что при post --chat-author-mode",
+  )
   .action(
     async (o: {
       token?: string;
@@ -78,6 +82,7 @@ program
       mid?: string;
       force?: boolean;
       dry?: boolean;
+      chatAuthorMode?: boolean;
     }) => {
       const token = o.dry ? "" : (o.token?.trim() ?? "");
       if (!token && !o.dry) {
@@ -92,6 +97,7 @@ program
         mid: o.mid,
         force: o.force,
         dry: o.dry,
+        chatAuthorMode: !!o.chatAuthorMode,
       });
     },
   );
@@ -109,6 +115,10 @@ program
   .option("--force", "Перезаписать maxMessageId даже если уже задан")
   .option("--dry", "Показать сопоставления без записи в state")
   .option("--max-pages <n>", "Лимит страниц GET /messages", "800")
+  .option(
+    "--chat-author-mode",
+    "Сопоставление как при post --chat-author-mode",
+  )
   .action(
     async (o: {
       token?: string;
@@ -119,6 +129,7 @@ program
       force?: boolean;
       dry?: boolean;
       maxPages?: string;
+      chatAuthorMode?: boolean;
     }) => {
       const token = o.token?.trim();
       if (!token && !o.dry) {
@@ -144,6 +155,7 @@ program
         force: o.force,
         dry: o.dry,
         maxPages,
+        chatAuthorMode: !!o.chatAuthorMode,
       });
     },
   );
@@ -168,6 +180,10 @@ program
     "--only-messages <ids>",
     "Только указанные id сообщений (через запятую), остальные не трогаются",
   )
+  .option(
+    "--chat-author-mode",
+    "Заголовок поста: «Имя · ДД.ММ.ГГГГ ЧЧ:ММ» из поля from дампа",
+  )
   .action(
     async (o: {
       token?: string;
@@ -177,6 +193,7 @@ program
       skipIfMediaMissing?: boolean;
       dry?: boolean;
       onlyMessages?: string;
+      chatAuthorMode?: boolean;
     }) => {
       const token = o.dry ? "" : (o.token?.trim() ?? "");
       if (!token && !o.dry) {
@@ -200,6 +217,7 @@ program
         skipIfMediaMissing: o.skipIfMediaMissing,
         dry: o.dry,
         onlyMessageIds: parseOnlyMessageIds(o.onlyMessages),
+        chatAuthorMode: !!o.chatAuthorMode,
       });
     });
 

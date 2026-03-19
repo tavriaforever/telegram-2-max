@@ -16,6 +16,35 @@ export interface TelegramDumpResult {
   messages: TelegramDumpMessage[];
 }
 
+/** Плейсхолдеры в экспорте Telegram, когда медиа не включили в архив */
+const DUMP_PATH_PLACEHOLDER_MARKERS = [
+  "file not included",
+  "change data exporting settings",
+] as const;
+
+/**
+ * Путь из дампа указывает на реальный файл в каталоге экспорта (не на текст-заглушку).
+ */
+export function isUsableDumpMediaPath(relativePath: string | undefined): relativePath is string {
+  if (relativePath == null || typeof relativePath !== "string") {
+    return false;
+  }
+  const s = relativePath.trim();
+  if (!s || s.startsWith("(")) {
+    return false;
+  }
+  const lower = s.toLowerCase();
+  for (const m of DUMP_PATH_PLACEHOLDER_MARKERS) {
+    if (lower.includes(m)) {
+      return false;
+    }
+  }
+  if (s.includes("\0")) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Определяет вложения сообщения для загрузки в Max.
  * Расширяемо: позже можно добавить альбомы, voice и т.д.
@@ -23,15 +52,17 @@ export interface TelegramDumpResult {
 export function attachmentsFromDumpMessage(msg: TelegramDumpMessage): NormalizedAttachment[] {
   const out: NormalizedAttachment[] = [];
 
-  if (msg.photo) {
+  if (isUsableDumpMediaPath(msg.photo)) {
     out.push({ kind: "image", relativePath: msg.photo });
   }
 
-  if (msg.file && msg.media_type === "video_file") {
-    out.push({ kind: "video", relativePath: msg.file });
-  } else if (msg.file && !msg.photo) {
-    // Документ (pdf, docx, …), не видео-сообщение
-    out.push({ kind: "file", relativePath: msg.file });
+  if (isUsableDumpMediaPath(msg.file)) {
+    if (msg.media_type === "video_file") {
+      out.push({ kind: "video", relativePath: msg.file });
+    } else if (!msg.photo) {
+      // Документ (pdf, docx, …), не видео-сообщение; стикеры без файла сюда не попадут
+      out.push({ kind: "file", relativePath: msg.file });
+    }
   }
 
   return out;
@@ -42,11 +73,13 @@ export function normalizeDumpMessage(msg: TelegramDumpMessage): NormalizedMessag
     return null;
   }
   const attachments = attachmentsFromDumpMessage(msg);
+  const from = typeof msg.from === "string" ? msg.from.trim() : "";
   return {
     id: msg.id,
     date: msg.date ?? "",
     text_entities: Array.isArray(msg.text_entities) ? msg.text_entities : [],
     attachments,
+    ...(from ? { author: from } : {}),
   };
 }
 

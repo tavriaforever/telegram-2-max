@@ -1,4 +1,5 @@
-import { entitiesToMarkdown, formatPostBody } from "../markdown/entities-to-markdown.js";
+import { messageToPostText } from "../markdown/entities-to-markdown.js";
+import { loadTelegramDump } from "../sources/telegram-dump.js";
 import {
   defaultStatePath,
   loadMigrationState,
@@ -54,6 +55,7 @@ export interface ReattachCmdOptions {
   mid?: string;
   force?: boolean;
   dry?: boolean;
+  chatAuthorMode?: boolean;
 }
 
 /**
@@ -64,6 +66,15 @@ export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
   const state = await loadMigrationState(statePath);
   if (!state) {
     throw new Error(`Нет state: ${statePath}`);
+  }
+
+  let authorById: Map<number, string> | undefined;
+  if (opts.chatAuthorMode) {
+    const { messages } = await loadTelegramDump(opts.dumpDir);
+    authorById = new Map();
+    for (const m of messages) {
+      if (m.author) authorById.set(m.id, m.author);
+    }
   }
 
   const client = new MaxMessagesClient(opts.token);
@@ -118,7 +129,7 @@ export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
       continue;
     }
 
-    const text = formatPostBody(entry.date, entitiesToMarkdown(entry.text_entities));
+    const text = messageToPostText(entry, id, !!opts.chatAuthorMode, authorById);
     const mid = resolvedMid;
 
     if (opts.dry) {

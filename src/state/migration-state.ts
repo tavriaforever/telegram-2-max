@@ -26,6 +26,7 @@ export function messageToStateEntry(msg: NormalizedMessage): MessageMigrationSta
   return {
     date: msg.date,
     text_entities: msg.text_entities,
+    ...(msg.author ? { author: msg.author } : {}),
     expectedMedia,
     upload,
     messagePosted: false,
