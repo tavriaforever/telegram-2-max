@@ -1,4 +1,7 @@
-import { messageToPostText } from "../markdown/entities-to-markdown.js";
+import {
+  messageToPostText,
+  PUBLICATION_DATE_PREFIX,
+} from "../markdown/entities-to-markdown.js";
 import { loadTelegramDump } from "../sources/telegram-dump.js";
 import {
   defaultStatePath,
@@ -8,7 +11,7 @@ import {
 import { fetchAllChatMessages } from "../max/chat-messages.js";
 import type { MessageMigrationState } from "../types.js";
 
-/** Упростить текст для сравнения (Max может отдавать без markdown) */
+/** Simplify text for comparison (Max may return plain text without markdown). */
 function simplify(s: string): string {
   return s
     .replace(/\*\*([^*]+)\*\*/g, "$1")
@@ -39,16 +42,26 @@ function wordOverlapRatio(a: string, b: string): number {
   return hit / wa.size;
 }
 
-function dateFilterSubstring(expectedFullText: string): string {
-  const classic = expectedFullText.match(/Дата публикации:\s*(\d{1,2}\.\d{1,2}\.\d{4})/i);
-  if (classic) {
-    return `дата публикации: ${classic[1]}`.toLowerCase();
+/**
+ * Substrings to narrow candidates by the publication date line.
+ */
+function dateFilterSubstrings(expectedFullText: string): string[] {
+  const keys: string[] = [];
+  const pubEn = expectedFullText.match(
+    new RegExp(
+      `${PUBLICATION_DATE_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(\\d{1,2}\\.\\d{1,2}\\.\\d{4})`,
+      "i",
+    ),
+  );
+  const dateStr = pubEn?.[1];
+  if (dateStr) {
+    keys.push(`${PUBLICATION_DATE_PREFIX} ${dateStr}`.toLowerCase());
   }
   const authorLine = expectedFullText.match(/·\s*(\d{1,2}\.\d{1,2}\.\d{4})\s+\d{1,2}:\d{1,2}/);
   if (authorLine) {
-    return authorLine[1].toLowerCase();
+    keys.push(authorLine[1].toLowerCase());
   }
-  return "";
+  return [...new Set(keys)];
 }
 
 export interface SyncMidsOptions {
@@ -57,22 +70,22 @@ export interface SyncMidsOptions {
   dumpDir: string;
   statePath?: string;
   onlyMessageIds?: Set<number>;
-  /** Перезаписать maxMessageId даже если уже есть */
+  /** Overwrite maxMessageId even if already set */
   force?: boolean;
   dry?: boolean;
   maxPages?: number;
-  /** Должен совпадать с тем, как делали post (заголовок с автором) */
+  /** Must match how post was run (author header) */
   chatAuthorMode?: boolean;
 }
 
 /**
- * Сопоставляет посты в чате (GET /messages) с записями state по тексту.
- * Отдельного поиска по тексту в API Max нет.
+ * Match chat messages (GET /messages) to state rows by text.
+ * Max has no dedicated “find message by text” API.
  */
 export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
   const statePath = opts.statePath ?? defaultStatePath(opts.dumpDir);
   const state = await loadMigrationState(statePath);
-  if (!state) throw new Error(`Нет state: ${statePath}`);
+  if (!state) throw new Error(`No state file: ${statePath}`);
 
   let authorById: Map<number, string> | undefined;
   if (opts.chatAuthorMode) {
@@ -83,14 +96,14 @@ export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
     }
   }
 
-  console.log("Загрузка сообщений чата через GET /messages…");
+  console.log("Loading chat messages via GET /messages…");
   const chatRows = await fetchAllChatMessages(opts.token, opts.chatId, {
     maxPages: opts.maxPages,
     onProgress: (n, p) => {
-      process.stdout.write(`\r  загружено сообщений: ${n}, страниц: ${p}   `);
+      process.stdout.write(`\r  loaded messages: ${n}, pages: ${p}   `);
     },
   });
-  console.log(`\nВсего уникальных сообщений из API: ${chatRows.length}`);
+  console.log(`\nUnique messages from API: ${chatRows.length}`);
 
   const candidates = chatRows.map((r) => ({
     mid: r.mid,
@@ -122,14 +135,14 @@ export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
     const exp = messageToPostText(entry, dumpId, !!opts.chatAuthorMode, authorById);
     const expS = simplify(exp);
     if (expS.length < 15) {
-      console.warn(`#${dumpId} слишком короткий текст — пропуск сопоставления`);
+      console.warn(`#${dumpId} text too short — skipping match`);
       continue;
     }
 
-    const dateKey = dateFilterSubstring(exp);
+    const dateKeys = dateFilterSubstrings(exp);
     const pool =
-      dateKey.length > 0
-        ? candidates.filter((c) => c.simple.includes(dateKey))
+      dateKeys.length > 0
+        ? candidates.filter((c) => dateKeys.some((k) => c.simple.includes(k)))
         : [];
 
     const searchIn = pool.length > 0 ? pool : candidates;
@@ -156,17 +169,17 @@ export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
     const second = scored[1];
 
     if (!best || best.score < 0.5) {
-      console.warn(`#${dumpId} не найдено совпадения по тексту (порог)`);
+      console.warn(`#${dumpId} no text match above threshold`);
       continue;
     }
     if (second && second.score > 0 && best.score - second.score < 0.08) {
-      console.warn(`#${dumpId} неоднозначно (${best.mid} vs ${second.mid}), пропуск`);
+      console.warn(`#${dumpId} ambiguous (${best.mid} vs ${second.mid}), skip`);
       ambiguous++;
       continue;
     }
 
     if (opts.dry) {
-      console.log(`[dry] #${dumpId} (дамп) → mid=${best.mid} (score≈${best.score.toFixed(2)})`);
+      console.log(`[dry] #${dumpId} (dump) → mid=${best.mid} (score≈${best.score.toFixed(2)})`);
       matched++;
       continue;
     }
@@ -179,6 +192,6 @@ export async function runSyncMids(opts: SyncMidsOptions): Promise<void> {
   }
 
   console.log(
-    `Готово: сопоставлено ${matched}, пропущено (уже есть mid / не постили) ${skipped}, неоднозначно ${ambiguous}`,
+    `Done: matched ${matched}, skipped (already has mid / not posted) ${skipped}, ambiguous ${ambiguous}`,
   );
 }

@@ -30,7 +30,7 @@ async function editWithRetries(
   } catch (e1) {
     if (MaxMessagesClient.isAttachmentNotReady(e1)) {
       for (const ms of [2000, 4000, 8000, 16000]) {
-        console.warn(`  attachment.not.ready, ждём ${ms / 1000} с…`);
+        console.warn(`  attachment.not.ready, waiting ${ms / 1000}s…`);
         await sleep(ms);
         try {
           await run();
@@ -40,7 +40,7 @@ async function editWithRetries(
         }
       }
     }
-    console.warn("  Повтор через 1.5 с…");
+    console.warn("  Retry in 1.5s…");
     await sleep(1500);
     await run();
   }
@@ -51,7 +51,7 @@ export interface ReattachCmdOptions {
   dumpDir: string;
   statePath?: string;
   onlyMessageIds?: Set<number>;
-  /** ID сообщения в Max (если в state нет maxMessageId) — только с одним id в --only-messages */
+  /** Max message id (if state has no maxMessageId) — only with a single id in --only-messages */
   mid?: string;
   force?: boolean;
   dry?: boolean;
@@ -59,13 +59,13 @@ export interface ReattachCmdOptions {
 }
 
 /**
- * PUT /messages — добавить вложения к уже отправленному посту (тот же текст).
+ * PUT /messages — add attachments to an already posted message (same text).
  */
 export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
   const statePath = opts.statePath ?? defaultStatePath(opts.dumpDir);
   const state = await loadMigrationState(statePath);
   if (!state) {
-    throw new Error(`Нет state: ${statePath}`);
+    throw new Error(`No state: ${statePath}`);
   }
 
   let authorById: Map<number, string> | undefined;
@@ -89,7 +89,7 @@ export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
     opts.mid?.trim() && singleDumpId !== undefined ? opts.mid.trim() : undefined;
   if (opts.mid?.trim() && singleDumpId === undefined) {
     console.warn(
-      "Флаг --mid работает вместе с ровно одним id в --only-messages (например --only-messages 58 --mid <id в Max>).",
+      "--mid requires exactly one id in --only-messages (e.g. --only-messages 58 --mid <Max message id>).",
     );
   }
 
@@ -100,7 +100,7 @@ export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
     if (!entry) continue;
 
     if (!entry.messagePosted) {
-      console.warn(`#${id} пропуск: сообщение ещё не опубликовано (post).`);
+      console.warn(`#${id} skip: message not posted yet (run post).`);
       continue;
     }
 
@@ -112,20 +112,20 @@ export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
           : undefined;
     if (!resolvedMid) {
       console.warn(
-        `#${id} пропуск: в state нет maxMessageId (ответ API при post не сохранил id). ` +
-          `Укажите id сообщения в Max: --only-messages ${id} --mid "<скопируйте из клиента Max / лога>"`,
+        `#${id} skip: no maxMessageId in state (POST response did not store id). ` +
+          `Pass Max message id: --only-messages ${id} --mid "<copy from Max client / logs>"`,
       );
       continue;
     }
 
     if (entry.attachmentsApplied && !opts.force) {
-      console.log(`#${id} пропуск (уже reattach, --force чтобы снова)`);
+      console.log(`#${id} skip (already reattached, use --force to redo)`);
       continue;
     }
 
     const attachments = buildAttachments(entry);
     if (attachments.length === 0) {
-      console.warn(`#${id} нет загруженных вложений в state — сначала upload`);
+      console.warn(`#${id} no uploaded attachments in state — run upload first`);
       continue;
     }
 
@@ -159,5 +159,5 @@ export async function runReattach(opts: ReattachCmdOptions): Promise<void> {
     }
   }
 
-  console.log(`Готово, обработано: ${done}`);
+  console.log(`Done, processed: ${done}`);
 }

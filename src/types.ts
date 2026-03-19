@@ -1,4 +1,4 @@
-/** Слот медиа в Max API */
+/** Media slot in Max API */
 export type MediaKind = "image" | "video" | "file";
 
 export interface TextEntity {
@@ -12,7 +12,7 @@ export interface TelegramDumpMessage {
   type: string;
   date: string;
   date_unixtime?: string;
-  /** Имя отправителя (личные чаты / группы / канал как автор) */
+  /** Sender name (DMs / groups / channel as author) */
   from?: string;
   text_entities?: TextEntity[];
   photo?: string;
@@ -32,7 +32,7 @@ export interface NormalizedMessage {
   date: string;
   text_entities: TextEntity[];
   attachments: NormalizedAttachment[];
-  /** Из поля from дампа */
+  /** From dump `from` field */
   author?: string;
 }
 
@@ -41,7 +41,7 @@ export type UploadSlotStatus = "pending" | "ok" | "error";
 export interface UploadSlotState {
   relativePath: string;
   status: UploadSlotStatus;
-  /** Полный JSON ответа после загрузки — используется как payload вложения */
+  /** Full upload response JSON — used as attachment payload */
   payload?: Record<string, unknown>;
   error?: string;
 }
@@ -49,14 +49,14 @@ export interface UploadSlotState {
 export interface MessageMigrationState {
   date: string;
   text_entities: TextEntity[];
-  /** Имя автора из дампа (для --chat-author-mode) */
+  /** Author name from dump (for --chat-author-mode) */
   author?: string;
   expectedMedia: Partial<Record<MediaKind, { relativePath: string }>>;
   upload: Partial<Record<MediaKind, UploadSlotState>>;
   messagePosted: boolean;
-  /** ID сообщения в Max (для PUT /messages?message_id=) */
+  /** Message id in Max (for PUT /messages?message_id=) */
   maxMessageId?: string | number;
-  /** Уже прикрепили вложения через reattach */
+  /** Attachments applied via reattach */
   attachmentsApplied?: boolean;
   lastError?: string;
 }

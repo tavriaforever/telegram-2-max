@@ -5,7 +5,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Текст сообщения из объекта Message в ответе GET /messages */
+/** Message text from a Message object in GET /messages response */
 export function extractApiMessageText(msg: unknown): string {
   if (msg == null || typeof msg !== "object") return "";
   const o = msg as Record<string, unknown>;
@@ -21,7 +21,7 @@ export function extractApiMessageText(msg: unknown): string {
     }
   }
   for (const v of Object.values(o)) {
-    if (typeof v === "string" && v.length > 20 && v.includes("Дата публикации")) return v;
+    if (typeof v === "string" && v.length > 20 && v.includes("Publication date")) return v;
   }
   return "";
 }
@@ -36,7 +36,7 @@ function compactNorm(s: string): string {
 }
 
 /**
- * Резерв: после POST, если mid не разобрали — GET /messages (последние записи) и поиск по тексту.
+ * Fallback: after POST, if mid was not parsed — GET /messages (recent) and match by text.
  */
 export async function lookupMidAfterPost(
   token: string,
@@ -100,8 +100,8 @@ export interface ChatMessageRow {
 }
 
 /**
- * Загрузка истории чата пачками — {@link https://dev.max.ru/docs-api/methods/GET/messages GET /messages}.
- * Параметры from/to (unix), count до 100. Идём окнами назад во времени.
+ * Fetch chat history in batches — {@link https://dev.max.ru/docs-api/methods/GET/messages GET /messages}.
+ * `from`/`to` unix params, count up to 100. Walks backward in time.
  */
 export async function fetchAllChatMessages(
   token: string,
@@ -138,7 +138,7 @@ export async function fetchAllChatMessages(
     try {
       data = JSON.parse(raw) as { messages?: unknown[] };
     } catch {
-      throw new Error(`GET /messages: не JSON — ${raw.slice(0, 200)}`);
+      throw new Error(`GET /messages: not JSON — ${raw.slice(0, 200)}`);
     }
 
     const messages = Array.isArray(data.messages) ? data.messages : [];

@@ -18,7 +18,7 @@ export function walkMid(obj: unknown, depth: number): string | undefined {
   return undefined;
 }
 
-/** ID сообщения в Max из ответа POST /messages */
+/** Message id in Max from POST /messages response */
 export function extractMaxMessageId(parsed: Record<string, unknown>): string | undefined {
   for (const key of ["message", "data", "result"]) {
     const root = parsed[key];
@@ -50,7 +50,7 @@ function midFromMessageNode(node: unknown): string | undefined {
   return undefined;
 }
 
-/** Парсинг сырого JSON ответа POST /messages (если структура нестандартная) */
+/** Parse raw POST /messages JSON when the shape is non-standard */
 export function extractMidFromResponseRawJson(raw: string): string | undefined {
   if (!raw?.trim()) return undefined;
   const tryPat = (re: RegExp): string | undefined => {
@@ -65,7 +65,7 @@ export function extractMidFromResponseRawJson(raw: string): string | undefined {
 }
 
 /**
- * Извлечь mid после успешного POST /messages (несколько вариантов структуры ответа Max).
+ * Extract mid after successful POST /messages (several possible Max response shapes).
  */
 export function extractPostMessageMid(
   parsed: Record<string, unknown>,
@@ -100,7 +100,7 @@ export interface SendMessageOptions {
 }
 
 export class MaxMessagesClient {
-  /** Время последнего успешного POST /messages (для интервала между сообщениями в чат) */
+  /** Time of last successful POST /messages (gap between chat messages) */
   private lastChatSendOkAt = 0;
 
   constructor(
@@ -163,15 +163,15 @@ export class MaxMessagesClient {
     try {
       parsed = JSON.parse(rawText) as Record<string, unknown>;
     } catch {
-      /* сырой текст всё равно в rawText для regex mid */
+      /* raw body still in rawText for regex mid */
     }
     return { parsed, rawText };
   }
 
   /**
-   * Редактирование сообщения — {@link https://dev.max.ru/docs-api/methods/PUT/messages PUT /messages}.
-   * Query: `message_id` (string). Тело: `text`, `format`, `attachments` (пустой список — удалить все вложения).
-   * Редактирование только для сообщений младше ~24 ч (по правилам Max).
+   * Edit message — {@link https://dev.max.ru/docs-api/methods/PUT/messages PUT /messages}.
+   * Query: `message_id` (string). Body: `text`, `format`, `attachments` (empty list removes all attachments).
+   * Editing may be limited to messages newer than ~24h (per Max rules).
    */
   async editMessage(
     messageId: string,
@@ -205,7 +205,7 @@ export class MaxMessagesClient {
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      /* не JSON */
+      /* not JSON */
     }
 
     if (!res.ok) {
@@ -220,7 +220,7 @@ export class MaxMessagesClient {
 
     if (parsed.success === false) {
       const msg = typeof parsed.message === "string" ? parsed.message : text;
-      throw new Error(`edit PUT /messages: success=false — ${msg}`);
+      throw new Error(`edit PUT /messages: success=false: ${msg}`);
     }
 
     return parsed;
@@ -234,7 +234,7 @@ export class MaxMessagesClient {
     return false;
   }
 
-  /** 429 / слишком частая отправка в чат */
+  /** 429 / too many chat send requests */
   static isTooManyChatRequests(err: unknown): boolean {
     if (err && typeof err === "object" && "status" in err) {
       const status = (err as { status: number }).status;

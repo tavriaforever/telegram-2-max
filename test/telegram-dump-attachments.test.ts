@@ -6,12 +6,12 @@ import {
 import type { TelegramDumpMessage } from "../src/types.js";
 
 describe("isUsableDumpMediaPath", () => {
-  it("принимает обычные относительные пути", () => {
+  it("accepts normal relative paths", () => {
     expect(isUsableDumpMediaPath("photos/photo_1@09-09-2024.jpg")).toBe(true);
     expect(isUsableDumpMediaPath("video_files/foo.mp4")).toBe(true);
   });
 
-  it("отклоняет плейсхолдер Telegram (файл не выгружен)", () => {
+  it("rejects Telegram placeholder (file not exported)", () => {
     expect(
       isUsableDumpMediaPath(
         "(File not included. Change data exporting settings to download.)",
@@ -20,7 +20,7 @@ describe("isUsableDumpMediaPath", () => {
     expect(isUsableDumpMediaPath("(File not included.)")).toBe(false);
   });
 
-  it("отклоняет пустое и пробелы", () => {
+  it("rejects empty and whitespace", () => {
     expect(isUsableDumpMediaPath("")).toBe(false);
     expect(isUsableDumpMediaPath("   ")).toBe(false);
     expect(isUsableDumpMediaPath(undefined)).toBe(false);
@@ -28,7 +28,7 @@ describe("isUsableDumpMediaPath", () => {
 });
 
 describe("attachmentsFromDumpMessage", () => {
-  it("не создаёт слот для стикера без файла в архиве", () => {
+  it("does not create slot for sticker without file in archive", () => {
     const msg = {
       id: 6,
       type: "message",
@@ -41,7 +41,7 @@ describe("attachmentsFromDumpMessage", () => {
     expect(attachmentsFromDumpMessage(msg)).toEqual([]);
   });
 
-  it("создаёт image для реального photo", () => {
+  it("creates image for real photo", () => {
     const msg = {
       id: 14,
       type: "message",
@@ -54,7 +54,7 @@ describe("attachmentsFromDumpMessage", () => {
     ]);
   });
 
-  it("не создаёт слот если photo — плейсхолдер", () => {
+  it("does not create slot when photo is placeholder", () => {
     const msg = {
       id: 1,
       type: "message",

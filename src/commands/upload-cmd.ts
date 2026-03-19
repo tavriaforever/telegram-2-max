@@ -9,7 +9,7 @@ import {
   saveMigrationStateAtomic,
 } from "../state/migration-state.js";
 import { MaxUploadClient } from "../max/upload-client.js";
-import type { MediaKind, MessageMigrationState, MigrationStateFile } from "../types.js";
+import type { MediaKind, MigrationStateFile } from "../types.js";
 
 function countPendingSlots(
   state: MigrationStateFile,
@@ -42,9 +42,9 @@ export interface UploadCmdOptions {
   statePath?: string;
   strict?: boolean;
   dry?: boolean;
-  /** Загружать медиа только у этих id сообщений дампа */
+  /** Upload media only for these dump message ids */
   onlyMessageIds?: Set<number>;
-  /** Сбросить status error → pending (чтобы повторить после исправления кода / API) */
+  /** Reset status error → pending (retry after fixing code / API) */
   resetFailed?: boolean;
 }
 
@@ -79,19 +79,19 @@ export async function runUpload(opts: UploadCmdOptions): Promise<void> {
   if (pendingTotal === 0) {
     if (only?.size) {
       console.log(
-        "Нет файлов в статусе pending для указанных --only-messages (уже загружены или нет медиа у этих id).",
+        "No files in pending status for the given --only-messages (already uploaded or no media for these ids).",
       );
     } else {
-      console.log("Нет файлов для загрузки (все уже обработаны или без медиа).");
+      console.log("Nothing to upload (all done or no media).");
     }
     return;
   }
 
   if (opts.dry) {
     const filterNote = only?.size
-      ? ` (только id: ${[...only].sort((a, b) => a - b).join(", ")})`
+      ? ` (only ids: ${[...only].sort((a, b) => a - b).join(", ")})`
       : "";
-    console.log(`[--dry] Тестовый режим${filterNote}. Слотов к загрузке: ${pendingTotal}`);
+    console.log(`[--dry] Dry run${filterNote}. Slots to upload: ${pendingTotal}`);
     const messageIds = Object.keys(state.messages)
       .map(Number)
       .sort((a, b) => a - b);
@@ -106,15 +106,15 @@ export async function runUpload(opts: UploadCmdOptions): Promise<void> {
         console.log(`  msg ${id} | ${kind} | ${slot.relativePath} -> ${abs}`);
       }
     }
-    console.log("Состояние записано:", statePath);
+    console.log("State written:", statePath);
     return;
   }
 
-  console.log(`К загрузке слотов: ${pendingTotal}`);
+  console.log(`Slots to upload: ${pendingTotal}`);
 
   const bar = new cliProgress.SingleBar(
     {
-      format: "Загрузка [{bar}] {percentage}% | {value}/{total} | msg {msgId} | {kind}",
+      format: "Upload [{bar}] {percentage}% | {value}/{total} | msg {msgId} | {kind}",
       barCompleteChar: "\u2588",
       barIncompleteChar: "\u2591",
     },
@@ -144,7 +144,7 @@ export async function runUpload(opts: UploadCmdOptions): Promise<void> {
 
       if (!(await fileExists(abs))) {
         slot.status = "error";
-        slot.error = `Файл не найден: ${abs}`;
+        slot.error = `File not found: ${abs}`;
         await saveMigrationStateAtomic(statePath, state);
         done++;
         bar.increment();
@@ -178,12 +178,12 @@ export async function runUpload(opts: UploadCmdOptions): Promise<void> {
       done++;
       bar.increment();
 
-      // Обработка attachment.not.ready на стадии upload не применима; пауза после крупных файлов
+      // attachment.not.ready does not apply at upload; brief pause after large files
       const sizeKind = kind === "video" ? 2000 : 500;
       await new Promise((r) => setTimeout(r, sizeKind));
     }
   }
 
   bar.stop();
-  console.log("Загрузка завершена. Состояние:", statePath);
+  console.log("Upload finished. State:", statePath);
 }

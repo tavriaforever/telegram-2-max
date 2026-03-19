@@ -8,23 +8,23 @@ import { parseOnlyMessageIds } from "./cli-parse.js";
 
 const program = new Command();
 
-program.name("max-migrate").description("Миграция дампа Telegram → Max");
+program.name("max-migrate").description("Migrate a Telegram dump to Max");
 
 program
   .command("upload")
-  .description("Загрузить медиа в Max и заполнить migration-state.json")
-  .option("--token <token>", "Токен бота Max", process.env.MAX_BOT_TOKEN)
-  .option("--dump <dir>", "Каталог дампа (где result.json)", "telegram-dump")
-  .option("--state <path>", "Путь к migration-state.json (по умолчанию: <dump>/migration-state.json)")
-  .option("--strict", "Остановиться при первой ошибке загрузки")
-  .option("--dry", "Тестовый режим: только создать/обновить state и показать, что было бы загружено")
+  .description("Upload media to Max and fill migration-state.json")
+  .option("--token <token>", "Max bot token", process.env.MAX_BOT_TOKEN)
+  .option("--dump <dir>", "Dump directory (contains result.json)", "telegram-dump")
+  .option("--state <path>", "Path to migration-state.json (default: <dump>/migration-state.json)")
+  .option("--strict", "Stop on the first upload error")
+  .option("--dry", "Dry run: only create/update state and list files that would be uploaded")
   .option(
     "--only-messages <ids>",
-    "Только указанные id сообщений из дампа (через запятую), например: 3,7,12",
+    "Only these message ids from the dump (comma-separated), e.g. 3,7,12",
   )
   .option(
     "--reset-failed",
-    "Сбросить ошибки загрузки (error→pending) для повторной попытки",
+    "Reset upload errors (error→pending) for retry",
   )
   .action(
     async (o: {
@@ -39,7 +39,7 @@ program
     const token = o.dry ? "" : (o.token?.trim() ?? "");
     if (!token) {
       if (!o.dry) {
-        console.error("Укажите --token или переменную MAX_BOT_TOKEN");
+        console.error("Set --token or MAX_BOT_TOKEN");
         process.exit(1);
       }
     }
@@ -57,21 +57,21 @@ program
 program
   .command("reattach")
   .description(
-    "Добавить вложения к уже опубликованным постам (PUT /messages), если пост ушёл без видео",
+    "Add attachments to already posted messages (PUT /messages), e.g. if a post went out without video",
   )
-  .option("--token <token>", "Токен бота Max", process.env.MAX_BOT_TOKEN)
-  .option("--dump <dir>", "Каталог дампа", "telegram-dump")
-  .option("--state <path>", "Путь к migration-state.json")
-  .option("--only-messages <ids>", "Только id сообщений дампа (через запятую)")
+  .option("--token <token>", "Max bot token", process.env.MAX_BOT_TOKEN)
+  .option("--dump <dir>", "Dump directory", "telegram-dump")
+  .option("--state <path>", "Path to migration-state.json")
+  .option("--only-messages <ids>", "Only these dump message ids (comma-separated)")
   .option(
     "--mid <id>",
-    "ID сообщения в Max (если в state нет maxMessageId); только с одним id в --only-messages",
+    "Message id in Max (if state has no maxMessageId); only with a single id in --only-messages",
   )
-  .option("--force", "Повторить reattach даже если уже помечено attachmentsApplied")
-  .option("--dry", "Показать тела PUT без вызова API")
+  .option("--force", "Run reattach even if already marked attachmentsApplied")
+  .option("--dry", "Print PUT bodies without calling the API")
   .option(
     "--chat-author-mode",
-    "Тот же заголовок текста, что при post --chat-author-mode",
+    "Same text header as post --chat-author-mode",
   )
   .action(
     async (o: {
@@ -86,7 +86,7 @@ program
     }) => {
       const token = o.dry ? "" : (o.token?.trim() ?? "");
       if (!token && !o.dry) {
-        console.error("Укажите --token или MAX_BOT_TOKEN");
+        console.error("Set --token or MAX_BOT_TOKEN");
         process.exit(1);
       }
       await runReattach({
@@ -105,19 +105,19 @@ program
 program
   .command("sync-mids")
   .description(
-    "Заполнить maxMessageId: загрузка истории чата (GET /messages) и сопоставление с постами по тексту",
+    "Fill maxMessageId: fetch chat history (GET /messages) and match posts by text",
   )
-  .option("--token <token>", "Токен бота Max", process.env.MAX_BOT_TOKEN)
-  .option("--chat-id <id>", "ID чата", process.env.MAX_CHAT_ID)
-  .option("--dump <dir>", "Каталог дампа", "telegram-dump")
-  .option("--state <path>", "Путь к migration-state.json")
-  .option("--only-messages <ids>", "Только эти id из дампа")
-  .option("--force", "Перезаписать maxMessageId даже если уже задан")
-  .option("--dry", "Показать сопоставления без записи в state")
-  .option("--max-pages <n>", "Лимит страниц GET /messages", "800")
+  .option("--token <token>", "Max bot token", process.env.MAX_BOT_TOKEN)
+  .option("--chat-id <id>", "Chat id", process.env.MAX_CHAT_ID)
+  .option("--dump <dir>", "Dump directory", "telegram-dump")
+  .option("--state <path>", "Path to migration-state.json")
+  .option("--only-messages <ids>", "Only these dump ids")
+  .option("--force", "Overwrite maxMessageId even if already set")
+  .option("--dry", "Print matches without writing state")
+  .option("--max-pages <n>", "Max GET /messages pages", "800")
   .option(
     "--chat-author-mode",
-    "Сопоставление как при post --chat-author-mode",
+    "Match the same way as post --chat-author-mode",
   )
   .action(
     async (o: {
@@ -133,16 +133,16 @@ program
     }) => {
       const token = o.token?.trim();
       if (!token && !o.dry) {
-        console.error("Укажите --token");
+        console.error("Set --token");
         process.exit(1);
       }
       if (o.chatId == null || o.chatId === "") {
-        console.error("Укажите --chat-id или MAX_CHAT_ID");
+        console.error("Set --chat-id or MAX_CHAT_ID");
         process.exit(1);
       }
       const chatId = parseInt(String(o.chatId), 10);
       if (Number.isNaN(chatId)) {
-        console.error("Некорректный --chat-id");
+        console.error("Invalid --chat-id");
         process.exit(1);
       }
       const maxPages = parseInt(o.maxPages ?? "800", 10) || 800;
@@ -162,27 +162,27 @@ program
 
 program
   .command("post")
-  .description("Опубликовать сообщения в групповой чат Max по состоянию")
-  .option("--token <token>", "Токен бота Max", process.env.MAX_BOT_TOKEN)
+  .description("Post messages to a Max group chat using migration state")
+  .option("--token <token>", "Max bot token", process.env.MAX_BOT_TOKEN)
   .option(
     "--chat-id <id>",
-    "ID группового чата Max",
+    "Max group chat id",
     process.env.MAX_CHAT_ID,
   )
-  .option("--dump <dir>", "Каталог дампа", "telegram-dump")
-  .option("--state <path>", "Путь к migration-state.json")
+  .option("--dump <dir>", "Dump directory", "telegram-dump")
+  .option("--state <path>", "Path to migration-state.json")
   .option(
     "--skip-if-media-missing",
-    "Не публиковать сообщения, у которых не все файлы загружены",
+    "Do not post messages whose files are not all uploaded",
   )
-  .option("--dry", "Тестовый режим: показать, какие сообщения были бы отправлены, без вызова API")
+  .option("--dry", "Dry run: show messages that would be sent, without calling the API")
   .option(
     "--only-messages <ids>",
-    "Только указанные id сообщений (через запятую), остальные не трогаются",
+    "Only these message ids (comma-separated); others are left unchanged",
   )
   .option(
     "--chat-author-mode",
-    "Заголовок поста: «Имя · ДД.ММ.ГГГГ ЧЧ:ММ» из поля from дампа",
+    "Post header: «Name · DD.MM.YYYY HH:MM» from dump `from` field",
   )
   .action(
     async (o: {
@@ -197,16 +197,16 @@ program
     }) => {
       const token = o.dry ? "" : (o.token?.trim() ?? "");
       if (!token && !o.dry) {
-        console.error("Укажите --token или MAX_BOT_TOKEN");
+        console.error("Set --token or MAX_BOT_TOKEN");
         process.exit(1);
       }
       if (o.chatId == null || o.chatId === "") {
-        console.error("Укажите --chat-id или переменную MAX_CHAT_ID");
+        console.error("Set --chat-id or MAX_CHAT_ID");
         process.exit(1);
       }
       const chatId = parseInt(String(o.chatId), 10);
       if (Number.isNaN(chatId)) {
-        console.error("Некорректный --chat-id");
+        console.error("Invalid --chat-id");
         process.exit(1);
       }
       await runPost({

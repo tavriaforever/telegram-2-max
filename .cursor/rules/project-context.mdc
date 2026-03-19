@@ -1,40 +1,40 @@
 ---
-description: Базовый контекст проекта — миграция Telegram → Max
+description: Project context — Telegram → Max migration
 alwaysApply: true
 ---
 
-# Проект max-migrate
+# max-migrate project
 
-Модуль для **миграции бота из Telegram в мессенджер Max**.
+Module for **migrating bot/channel workflows from Telegram to the Max messenger**.
 
-## Стек
+## Stack
 
-- **Язык:** TypeScript
-- **Среда:** Node.js 22
-- **Библиотека Max:** `@maxhub/max-bot-api` (официальный клиент)
-  - Репозиторий: https://github.com/max-messenger/max-bot-api-client-ts
-  - Установка: `npm install @maxhub/max-bot-api`
+- **Language:** TypeScript
+- **Runtime:** Node.js 22
+- **Max library:** `@maxhub/max-bot-api` (official client)
+  - Repo: https://github.com/max-messenger/max-bot-api-client-ts
+  - Install: `npm install @maxhub/max-bot-api`
 
-## Документация
+## Documentation
 
-- **Документация Max для ботов (JS/TS):** https://dev.max.ru/docs/chatbots/bots-coding/library/js
-- **Актуальная документация мессенджера Max в Context7:** https://context7.com/websites/dev_max_ru — **использовать при вопросах по API Max** (подключать через @Docs или context7).
+- **Max bots (JS/TS):** https://dev.max.ru/docs/chatbots/bots-coding/library/js
+- **Max messenger docs on Context7:** https://context7.com/websites/dev_max_ru — **use for Max API questions** (@Docs or context7).
 
-## Базовый паттерн Max Bot API
+## Max Bot API baseline
 
 ```typescript
 import { Bot } from '@maxhub/max-bot-api';
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
-bot.command('start', (ctx) => ctx.reply('Добро пожаловать!'));
+bot.command('start', (ctx) => ctx.reply('Welcome!'));
 bot.on('message_created', (ctx) => ctx.reply(ctx.message.body.text));
 
 bot.start();
 ```
 
-События: `bot_started`, `message_created`, `message_edited`, `message_removed`, `bot_added`, `bot_removed`, `user_added`, `user_removed`, `chat_title_changed`, `message_callback`. Отправка: `ctx.reply()`, `bot.api.sendMessageToUser()`, `bot.api.sendMessageToChat()`. Для методов без обёртки — `ctx.api.raw.get/post/put/patch/delete`.
+Events: `bot_started`, `message_created`, `message_edited`, `message_removed`, `bot_added`, `bot_removed`, `user_added`, `user_removed`, `chat_title_changed`, `message_callback`. Sending: `ctx.reply()`, `bot.api.sendMessageToUser()`, `bot.api.sendMessageToChat()`. For methods without wrappers — `ctx.api.raw.get/post/put/patch/delete`.
 
-## Задачи проекта
+## Project goals
 
-При переносе логики с Telegram на Max учитывать отличия API (события, типы сообщений, вложения, клавиатуры). Сверяться с документацией Max в Context7 и dev.max.ru.
+When porting logic from Telegram to Max, account for API differences (events, message types, attachments, keyboards). Cross-check Max docs on Context7 and dev.max.ru.

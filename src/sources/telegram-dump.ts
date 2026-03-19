@@ -16,14 +16,14 @@ export interface TelegramDumpResult {
   messages: TelegramDumpMessage[];
 }
 
-/** Плейсхолдеры в экспорте Telegram, когда медиа не включили в архив */
+/** Telegram export placeholders when media was not included in the archive */
 const DUMP_PATH_PLACEHOLDER_MARKERS = [
   "file not included",
   "change data exporting settings",
 ] as const;
 
 /**
- * Путь из дампа указывает на реальный файл в каталоге экспорта (не на текст-заглушку).
+ * Dump path points at a real file under the export directory (not a placeholder string).
  */
 export function isUsableDumpMediaPath(relativePath: string | undefined): relativePath is string {
   if (relativePath == null || typeof relativePath !== "string") {
@@ -46,8 +46,8 @@ export function isUsableDumpMediaPath(relativePath: string | undefined): relativ
 }
 
 /**
- * Определяет вложения сообщения для загрузки в Max.
- * Расширяемо: позже можно добавить альбомы, voice и т.д.
+ * Resolve message attachments to upload to Max.
+ * Extensible: albums, voice, etc. later.
  */
 export function attachmentsFromDumpMessage(msg: TelegramDumpMessage): NormalizedAttachment[] {
   const out: NormalizedAttachment[] = [];
@@ -60,7 +60,7 @@ export function attachmentsFromDumpMessage(msg: TelegramDumpMessage): Normalized
     if (msg.media_type === "video_file") {
       out.push({ kind: "video", relativePath: msg.file });
     } else if (!msg.photo) {
-      // Документ (pdf, docx, …), не видео-сообщение; стикеры без файла сюда не попадут
+      // Document (pdf, docx, …), not a video message; stickers without a file are skipped
       out.push({ kind: "file", relativePath: msg.file });
     }
   }
@@ -90,7 +90,7 @@ export async function loadTelegramDump(
   const raw = await readFile(resultPath, "utf-8");
   const data = JSON.parse(raw) as TelegramDumpResult;
   if (!Array.isArray(data.messages)) {
-    throw new Error(`Нет массива messages в ${resultPath}`);
+    throw new Error(`No messages array in ${resultPath}`);
   }
   const messages: NormalizedMessage[] = [];
   for (const m of data.messages) {
@@ -109,7 +109,7 @@ export function cloneEntities(entities: TextEntity[]): TextEntity[] {
   return entities.map((e) => ({ ...e }));
 }
 
-/** Реализация {@link MessageSource} для дампа Telegram Desktop */
+/** {@link MessageSource} for Telegram Desktop export */
 export class TelegramDumpSource implements MessageSource {
   readonly dumpDir: string;
 

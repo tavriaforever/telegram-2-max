@@ -1,6 +1,6 @@
 import type { MessageMigrationState, TextEntity } from "../types.js";
 
-/** Экранирование для фрагментов вне спец-разметки */
+/** Escape plain fragments (outside special markdown) */
 export function escapeMarkdownPlain(text: string): string {
   return text.replace(/\\/g, "\\\\").replace(/([*_`\[\]])/g, "\\$1");
 }
@@ -18,7 +18,7 @@ function escapeLinkLabel(text: string): string {
 }
 
 /**
- * Собирает markdown из text_entities дампа Telegram (поле text не используется).
+ * Build markdown from Telegram dump `text_entities` (the `text` field is not used).
  */
 export function entitiesToMarkdown(entities: TextEntity[] | undefined): string {
   if (!entities?.length) {
@@ -80,8 +80,11 @@ export function entitiesToMarkdown(entities: TextEntity[] | undefined): string {
 
 const MAX_TEXT = 4000;
 
+/** Prefix for channel-style posts (must stay in sync with sync-mids date matching). */
+export const PUBLICATION_DATE_PREFIX = "Publication date:" as const;
+
 export interface FormatPostBodyOptions {
-  /** Режим чата: первая строка «Имя · ДД.ММ.ГГГГ ЧЧ:ММ» */
+  /** Chat mode: first line «Name · DD.MM.YYYY HH:MM» */
   chatAuthorMode?: boolean;
   author?: string;
 }
@@ -101,7 +104,7 @@ function formatHeaderLine(
   if (opts?.chatAuthorMode && author) {
     return `${author} · ${dd}.${mm}.${yyyy} ${hh}:${min}`;
   }
-  return `Дата публикации: ${dd}.${mm}.${yyyy}`;
+  return `${PUBLICATION_DATE_PREFIX} ${dd}.${mm}.${yyyy}`;
 }
 
 export function formatPostBody(
@@ -117,12 +120,12 @@ export function formatPostBody(
     return full;
   }
 
-  const truncated = full.slice(0, MAX_TEXT - 20) + "\n\n…(обрезано)";
+  const truncated = full.slice(0, MAX_TEXT - 20) + "\n\n...(truncated)";
   return truncated;
 }
 
 /**
- * Текст поста как при post/reattach/sync-mids (markdown + заголовок).
+ * Full post text as used by post / reattach / sync-mids (markdown + header).
  */
 export function messageToPostText(
   entry: MessageMigrationState,

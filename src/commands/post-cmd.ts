@@ -7,7 +7,7 @@ import {
 } from "../state/migration-state.js";
 import { lookupMidAfterPost } from "../max/chat-messages.js";
 import { extractPostMessageMid, MaxMessagesClient } from "../max/messages-client.js";
-import type { MediaKind, MessageMigrationState, MigrationStateFile } from "../types.js";
+import type { MediaKind, MessageMigrationState } from "../types.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -29,8 +29,8 @@ export function buildAttachments(entry: MessageMigrationState): Array<{
 }
 
 /**
- * Для --dry: всегда показываем массив attachments в формате API;
- * если файл ещё не загружен — плейсхолдер вместо token.
+ * For --dry: always show attachments in API shape;
+ * if a file is not uploaded yet — placeholder instead of token.
  */
 export function buildAttachmentsForDryPreview(
   messageId: number,
@@ -47,7 +47,7 @@ export function buildAttachmentsForDryPreview(
       out.push({
         type: kind,
         payload: {
-          token: `<загрузите: npx tsx src/cli.ts upload --only-messages ${messageId}>`,
+          token: `<upload first: npx tsx src/cli.ts upload --only-messages ${messageId}>`,
         },
       });
     }
@@ -91,7 +91,7 @@ async function sendWithRetries(
       let attachmentAfter429: unknown | undefined;
       for (const ms of rateWaits) {
         console.warn(
-          `  Лимит отправки в чат (429), пауза ${ms / 1000} с и повтор…`,
+          `  Chat send rate limit (429), waiting ${ms / 1000}s before retry…`,
         );
         await sleep(ms);
         try {
@@ -117,7 +117,7 @@ async function sendWithRetries(
     if (MaxMessagesClient.isAttachmentNotReady(err)) {
       const backoff = [2000, 4000, 8000, 16000, 32000];
       for (const ms of backoff) {
-        console.warn(`  Вложение не готово (attachment.not.ready), ждём ${ms / 1000} с…`);
+        console.warn(`  Attachment not ready (attachment.not.ready), waiting ${ms / 1000}s…`);
         await sleep(ms);
         try {
           return await trySend();
@@ -130,7 +130,7 @@ async function sendWithRetries(
       throw err;
     }
 
-    console.warn("  Ошибка отправки, повтор через 1.5 с…");
+    console.warn("  Send error, retry in 1.5s…");
     await sleep(1500);
     return await trySend();
   }
@@ -143,9 +143,9 @@ export interface PostCmdOptions {
   statePath?: string;
   skipIfMediaMissing?: boolean;
   dry?: boolean;
-  /** Только эти id сообщений из дампа (точечная публикация) */
+  /** Only these dump message ids (targeted posting) */
   onlyMessageIds?: Set<number>;
-  /** Заголовок «Имя · дата время» из дампа (группы / чаты) */
+  /** «Name · date time» header from dump (groups / chats) */
   chatAuthorMode?: boolean;
 }
 
@@ -153,7 +153,7 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
   const statePath = opts.statePath ?? defaultStatePath(opts.dumpDir);
   const state = await loadMigrationState(statePath);
   if (!state) {
-    throw new Error(`Нет файла состояния: ${statePath}. Сначала выполните upload.`);
+    throw new Error(`No state file: ${statePath}. Run upload first.`);
   }
 
   let authorById: Map<number, string> | undefined;
@@ -173,11 +173,11 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
     const baseUrl = "https://platform-api.max.ru";
     let wouldPost = 0;
     const filterNote = opts.onlyMessageIds?.size
-      ? ` (только id: ${[...opts.onlyMessageIds].sort((a, b) => a - b).join(", ")})`
+      ? ` (only ids: ${[...opts.onlyMessageIds].sort((a, b) => a - b).join(", ")})`
       : "";
-    console.log(`[--dry] Тестовый режим${filterNote}.\n`);
+    console.log(`[--dry] Dry run${filterNote}.\n`);
     console.log(
-      "Вложения: если upload ещё не делали — token в payload показан как плейсхолдер; после upload подставятся реальные данные из API.\n",
+      "Attachments: if you have not run upload yet, payload token is a placeholder; after upload real API data is used.\n",
     );
     for (const id of ids) {
       if (opts.onlyMessageIds && !opts.onlyMessageIds.has(id)) continue;
@@ -198,23 +198,23 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
       const url = `${baseUrl}/messages?chat_id=${opts.chatId}`;
 
       console.log("─".repeat(60));
-      console.log(`Сообщение #${id} (id в дампе)`);
+      console.log(`Message #${id} (dump id)`);
       console.log("─".repeat(60));
-      console.log("Полный текст:");
+      console.log("Full text:");
       console.log(text);
       console.log("");
-      console.log("Запрос, который был бы выполнен:");
+      console.log("Request that would be sent:");
       console.log("  URL:    ", url);
       console.log("  Method: POST");
       console.log("  Headers:");
       console.log("    Authorization: <token>");
       console.log("    Content-Type:  application/json");
-      console.log("  Body (JSON) — формат как в POST /messages:");
+      console.log("  Body (JSON) — same shape as POST /messages:");
       console.log(JSON.stringify(body, null, 2));
       console.log("");
     }
     console.log("─".repeat(60));
-    console.log(`Всего к отправке: ${wouldPost}`);
+    console.log(`Would post: ${wouldPost}`);
     return;
   }
 
@@ -234,9 +234,9 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
     }
 
     if (opts.skipIfMediaMissing && mediaMissing(entry)) {
-      entry.lastError = "Пропуск: не все медиа загружены (--skip-if-media-missing)";
+      entry.lastError = "Skipped: not all media uploaded (--skip-if-media-missing)";
       await saveMigrationStateAtomic(statePath, state);
-      console.log(`#${id} пропуск (нет медиа)`);
+      console.log(`#${id} skip (missing media)`);
       skipped++;
       continue;
     }
@@ -244,7 +244,7 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
     const text = messageToPostText(entry, id, !!opts.chatAuthorMode, authorById);
     const attachments = buildAttachments(entry);
 
-    console.log(`Публикация сообщения id=${id}…`);
+    console.log(`Posting message id=${id}…`);
 
     try {
       const { parsed, rawText } = await sendWithRetries(client, {
@@ -257,18 +257,18 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
       let mid = extractPostMessageMid(parsed, rawText);
       let midViaLookup = false;
       if (mid == null) {
-        console.warn(`#${id}: mid нет в ответе POST → GET /messages…`);
+        console.warn(`#${id}: no mid in POST response → GET /messages…`);
         mid = await lookupMidAfterPost(opts.token, opts.chatId, text);
         midViaLookup = mid != null;
       }
       if (mid != null) {
         entry.maxMessageId = mid;
         if (midViaLookup) {
-          console.log(`#${id}: maxMessageId=${mid} (по тексту в чате)`);
+          console.log(`#${id}: maxMessageId=${mid} (matched text in chat)`);
         }
       } else {
         console.warn(
-          `#${id}: mid не удалось получить — reattach с --mid или sync-mids. Ответ POST: ${rawText.slice(0, 350)}…`,
+          `#${id}: could not get mid — use reattach --mid or sync-mids. POST body: ${rawText.slice(0, 350)}…`,
         );
       }
       await saveMigrationStateAtomic(statePath, state);
@@ -277,11 +277,11 @@ export async function runPost(opts: PostCmdOptions): Promise<void> {
       const msg = e instanceof Error ? e.message : String(e);
       entry.lastError = msg;
       await saveMigrationStateAtomic(statePath, state);
-      console.error(`Ошибка для id=${id}:`, msg);
+      console.error(`Error for id=${id}:`, msg);
       process.exitCode = 1;
       break;
     }
   }
 
-  console.log(`Готово. Опубликовано: ${posted}, пропущено (уже было): ${skipped}`);
+  console.log(`Done. Posted: ${posted}, skipped (already posted): ${skipped}`);
 }

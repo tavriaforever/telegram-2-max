@@ -1,28 +1,28 @@
-# CLI миграция Telegram → Max (дорожная карта)
+# CLI migration Telegram → Max (roadmap)
 
-Краткое описание реализации; детали запуска — в [README.md](../README.md).
+Short implementation notes; run details are in [README.md](../README.md).
 
-## Этапы
+## Phases
 
-1. **Скелет** — `package.json`, `src/cli.ts`, команды `upload` / `post`.
-2. **Дамп + состояние** — парсинг `result.json`, `migration-state.json`, merge при повторном запуске.
+1. **Skeleton** — `package.json`, `src/cli.ts`, `upload` / `post` commands.
+2. **Dump + state** — parse `result.json`, `migration-state.json`, merge on re-run.
 3. **Markdown** — `text_entities` → Max markdown (`src/markdown/entities-to-markdown.ts`).
-4. **Upload** — `POST /uploads`, multipart на CDN, сохранение payload в state.
-5. **Post** — `POST /messages?chat_id=`, ретраи, `messagePosted`.
+4. **Upload** — `POST /uploads`, multipart to CDN, store payload in state.
+5. **Post** — `POST /messages?chat_id=`, retries, `messagePosted`.
 
-## Схема `migration-state.json`
+## `migration-state.json` shape
 
 - `version`, `dumpPath`, `resultJsonPath`, `updatedAt`
 - `messages.<telegramId>`:
   - `date`, `text_entities`
-  - `expectedMedia`: какие слоты (`image` | `video` | `file`) и относительный путь
+  - `expectedMedia`: which slots (`image` | `video` | `file`) and relative path
   - `upload.<kind>`: `status` (`pending` | `ok` | `error`), `payload`, `error`
   - `messagePosted`, `maxMessageId`, `lastError`
 
-## Архитектура
+## Architecture
 
 ```
-TelegramDumpSource → нормализованные сообщения → MaxUploadClient / MaxMessagesClient
+TelegramDumpSource → normalized messages → MaxUploadClient / MaxMessagesClient
 ```
 
-Дальше: отдельный `TelegramApiSource` с тем же контрактом нормализации.
+Next: a separate `TelegramApiSource` with the same normalization contract.

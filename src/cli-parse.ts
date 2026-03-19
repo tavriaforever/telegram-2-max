@@ -1,4 +1,4 @@
-/** Парсинг списка id: "3,7,12" или "3 7 12" */
+/** Parse id list: "3,7,12" or "3 7 12" */
 export function parseOnlyMessageIds(s: string | undefined): Set<number> | undefined {
   if (s == null || !String(s).trim()) return undefined;
   const ids = String(s)

@@ -34,12 +34,12 @@ export class MaxUploadClient {
   }
 
   /**
-   * Видео/аудио (документация POST /uploads):
+   * Video/audio (POST /uploads docs):
    * 1) POST /uploads?type=video → { url, token? }
-   * 2) Multipart на url — в примере Max **без** Authorization на CDN, ответ JSON { token }
-   * 3) В сообщении: attachments[].payload = объект из шага 2 (обычно { token })
+   * 2) Multipart to url — in Max’s example **no** Authorization on CDN, JSON { token }
+   * 3) Message: attachments[].payload = object from step 2 (usually { token })
    *
-   * Текст про «retval»: после загрузки CDN может ответить XML; тогда используем token из шага 1.
+   * On XML `retval`: CDN may return XML after upload; then use token from step 1.
    */
   async uploadFile(
     absolutePath: string,
@@ -64,7 +64,7 @@ export class MaxUploadClient {
     const initJson = (await initRes.json()) as { url: string; token?: string };
 
     if (!initJson.url) {
-      throw new Error("Ответ uploads без url");
+      throw new Error("uploads response missing url");
     }
 
     const makeForm = async () => {
@@ -81,7 +81,7 @@ export class MaxUploadClient {
     let rawBody: string;
 
     if (maxType === "video") {
-      // Как в доке: curl на UPLOAD_URL только с multipart, без Authorization
+      // As in docs: curl to UPLOAD_URL with multipart only, no Authorization
       upRes = await fetch(initJson.url, {
         method: "POST",
         body: await makeForm(),
@@ -109,7 +109,7 @@ export class MaxUploadClient {
           return { payload: j };
         }
       } catch {
-        /* не JSON — ниже retval + token из /uploads */
+        /* not JSON — retval + token from /uploads below */
       }
 
       if (isVideoCdnSuccess(true, rawBody) && typeof initJson.token === "string") {
@@ -117,10 +117,10 @@ export class MaxUploadClient {
       }
 
       throw new Error(
-        `Видео: нет JSON с token от CDN. Тело: ${rawBody.slice(0, 400)}. ` +
+        `Video: no JSON with token from CDN. Body: ${rawBody.slice(0, 400)}. ` +
           (initJson.token
             ? ""
-            : "В ответе POST /uploads?type=video нет token — проверьте API."),
+            : "No token in POST /uploads?type=video response — check API."),
       );
     }
 
@@ -140,7 +140,7 @@ export class MaxUploadClient {
       upJson = JSON.parse(rawBody) as Record<string, unknown>;
     } catch {
       throw new Error(
-        `Ответ CDN не JSON (ожидали token для ${maxType}): ${rawBody.slice(0, 200)}`,
+        `CDN response not JSON (expected token for ${maxType}): ${rawBody.slice(0, 200)}`,
       );
     }
 
@@ -152,7 +152,7 @@ export class MaxUploadClient {
       return { payload: upJson as Record<string, unknown> };
     }
 
-    throw new Error("Пустой ответ после загрузки файла");
+    throw new Error("Empty response after file upload");
   }
 
   static isAttachmentNotReady(err: unknown): boolean {

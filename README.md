@@ -1,52 +1,52 @@
 # max-migrate
 
-CLI для переноса архива канала Telegram (экспорт Telegram Desktop: `result.json` + файлы) в мессенджер **Max**.
+CLI to migrate a Telegram channel archive (Telegram Desktop export: `result.json` + files) into the **Max** messenger.
 
-## Требования
+## Requirements
 
 - Node.js **22+**
-- Токен бота Max и ID группового чата, куда бот добавлен
+- A Max bot token and the group chat ID where the bot is added
 
-## Установка
+## Installation
 
 ```bash
 npm install
 ```
 
-## Переменные окружения
+## Environment variables
 
-| Переменная       | Описание                          |
-| ---------------- | --------------------------------- |
-| `MAX_BOT_TOKEN`  | Токен бота (можно вместо `--token`) |
-| `MAX_CHAT_ID`    | ID чата для команды `post`        |
-| `MAX_POST_MESSAGE_DELAY_MS` | Пауза между успешными POST /messages в один чат (по умолчанию 2500 мс; при 429 можно увеличить, например 4000) |
+| Variable                    | Description                                                                 |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `MAX_BOT_TOKEN`             | Bot token (alternative to `--token`)                                       |
+| `MAX_CHAT_ID`               | Chat ID for the `post` command                                             |
+| `MAX_POST_MESSAGE_DELAY_MS` | Delay between successful POST /messages to the same chat (default 2500 ms; increase on 429, e.g. 4000) |
 
-## Полный сценарий: как запускать
+## End-to-end: how to run
 
-1. **Экспорт в Telegram Desktop** — папка с `result.json` и каталогами `photos/`, `video_files/` и т.д. (путь к папке дальше называем **каталог дампа**).
-2. **Переменные** (удобно в shell):
+1. **Export in Telegram Desktop** — a folder with `result.json` and directories `photos/`, `video_files/`, etc. (we call this path the **dump directory**).
+2. **Environment** (convenient in the shell):
    ```bash
    export MAX_BOT_TOKEN="…"
-   export MAX_CHAT_ID="…"   # ID чата Max, куда добавлен бот
+   export MAX_CHAT_ID="…"   # Max chat ID where the bot is added
    ```
-3. **Проверка без API** — создаётся/обновляется `migration-state.json`, видно, какие файлы пойдут в upload:
+3. **Check without API** — creates/updates `migration-state.json`; shows which files would be uploaded:
    ```bash
-   npx tsx src/cli.ts upload --dump путь/к/дампу --dry
+   npx tsx src/cli.ts upload --dump path/to/dump --dry
    ```
-4. **Загрузка медиа** в Max (долго на больших чатах):
+4. **Upload media** to Max (can take a long time on large chats):
    ```bash
-   npx tsx src/cli.ts upload --dump путь/к/дампу
+   npx tsx src/cli.ts upload --dump path/to/dump
    ```
-5. **Проверка постов** (текст + тело запроса):
+5. **Dry-run posts** (text + request body):
    ```bash
-   npx tsx src/cli.ts post --dump путь/к/дампу --dry
+   npx tsx src/cli.ts post --dump path/to/dump --dry
    ```
-6. **Публикация**:
+6. **Publish**:
    ```bash
-   npx tsx src/cli.ts post --dump путь/к/дампу
+   npx tsx src/cli.ts post --dump path/to/dump
    ```
 
-**Пример** для каталога `kids-dump` в корне проекта:
+**Example** for a `kids-dump` folder at the project root:
 
 ```bash
 npx tsx src/cli.ts upload --dump kids-dump --dry
@@ -55,109 +55,109 @@ npx tsx src/cli.ts post --dump kids-dump --dry
 npx tsx src/cli.ts post --dump kids-dump
 ```
 
-**Большие чаты** (тысячи сообщений): один прогон может занять часы; периодически бэкапьте `migration-state.json`. Точечно: `--only-messages 3,7,12` у `upload` и `post`.
+**Large chats** (thousands of messages): one run may take hours; back up `migration-state.json` periodically. Targeted runs: `--only-messages 3,7,12` on `upload` and `post`.
 
-**Групповой чат / имя автора в посте:** добавьте **`--chat-author-mode`** к `post` — первая строка будет вида `Имя из поля from · ДД.ММ.ГГГГ ЧЧ:ММ`, затем текст. Тот же флаг нужен для **`reattach`** и **`sync-mids`**, если посты уже ушли в этом режиме (иначе текст для PUT и сопоставление не совпадут).
+**Group chat / author name in the post:** add **`--chat-author-mode`** to `post` — the first line is **author name** (from the **`from`** field in the dump) **·** **DD.MM.YYYY HH:MM**, then the message body. The same flag is required for **`reattach`** and **`sync-mids`** if posts were already sent in this mode (otherwise PUT text and matching will not align).
 
-**Медиа не попало в экспорт** (в JSON путь вида «File not included…»): для таких сообщений **слот загрузки не создаётся** — в Max уйдёт текст (и строка даты), без вложения; отдельно включайте медиа в настройках экспорта Telegram, если нужны файлы.
+**Media missing from export** (JSON path like “File not included…”): for such messages **no upload slot is created** — Max will get the text (and date line) without an attachment; enable media separately in Telegram export settings if you need files.
 
-## Команды
+## Commands
 
-### 1. Загрузка медиа в Max
+### 1. Upload media to Max
 
-Создаёт/обновляет `migration-state.json` в каталоге дампа, загружает фото, видео и файлы. Повторный запуск пропускает уже успешно загруженные слоты.
+Creates/updates `migration-state.json` in the dump directory; uploads photos, videos, and files. Re-runs skip slots that already uploaded successfully.
 
 ```bash
-npm run migrate:upload -- --token "<токен>" --dump telegram-dump
-# или
+npm run migrate:upload -- --token "<token>" --dump telegram-dump
+# or
 npx tsx src/cli.ts upload --dump telegram-dump
 ```
 
-Опции:
+Options:
 
-- `--state <path>` — свой путь к JSON состояния
-- `--strict` — остановка при первой ошибке загрузки
-- `--dry` — тестовый режим: создать/обновить state и вывести список файлов, которые были бы загружены (без вызова API)
-- `--only-messages 3,7,12` — загрузить медиа **только** у этих id сообщений из дампа; в state по-прежнему пишутся только обработанные слоты, повторный запуск не дублирует уже `ok`
+- `--state <path>` — custom path to the state JSON
+- `--strict` — stop on the first upload error
+- `--dry` — dry run: create/update state and print files that would be uploaded (no API calls)
+- `--only-messages 3,7,12` — upload media **only** for these message IDs from the dump; state still records only processed slots; re-runs do not duplicate already `ok` entries
 
-Пути-заглушки из экспорта (`(File not included…)`, «Change data exporting…») **игнорируются** — для них нет слотов в state и попытки загрузки не выполняются.
+Placeholder paths from export (`(File not included…)`, “Change data exporting…”) are **ignored** — no slots in state and no upload attempts.
 
-**Точечная проверка:** сначала `upload --only-messages 3`, затем `post --only-messages 3`; потом полный `upload` и `post` без фильтра — уже готовые сообщения пропускаются.
+**Spot check:** first `upload --only-messages 3`, then `post --only-messages 3`; then full `upload` and `post` without filter — already completed messages are skipped.
 
-**Видео** ([документация](https://dev.max.ru/docs-api/methods/POST/uploads)): загрузка на CDN — **без** заголовка `Authorization` (как в примере с `vu.mycdn.me`); токен для `POST /messages` — из **JSON-ответа CDN** `{ "token": "…" }`. Если CDN вернул XML `retval`, используется опциональный `token` из первого ответа `POST /uploads?type=video`. При старой ошибке в state — `--reset-failed` и повторный `upload`:
+**Video** ([docs](https://dev.max.ru/docs-api/methods/POST/uploads)): CDN upload is **without** the `Authorization` header (as in the `vu.mycdn.me` example); the token for `POST /messages` comes from the **CDN JSON response** `{ "token": "…" }`. If the CDN returns XML `retval`, the optional `token` from the first `POST /uploads?type=video` response is used. For stale errors in state — `--reset-failed` and re-run `upload`:
 
 ```bash
 npx tsx src/cli.ts upload --token "$T" --dump telegram-dump --reset-failed --only-messages 7
 ```
 
-### 2. Публикация сообщений
+### 2. Post messages
 
-По очереди (по возрастанию `id` сообщения в дампе) отправляет сообщения в чат: по умолчанию в начале строка `Дата публикации: dd.mm.yyyy`, далее markdown из `text_entities`. С флагом **`--chat-author-mode`** — `Имя автора · dd.mm.yyyy hh:mm` (поле **`from`** в `result.json`); если `from` нет, остаётся формат с «Дата публикации».
+In order (ascending message `id` in the dump) sends messages to the chat: by default the first line is `Publication date: dd.mm.yyyy`, then markdown from `text_entities`. With **`--chat-author-mode`** — `Author name · dd.mm.yyyy hh:mm` (the **`from`** field in `result.json`); if `from` is missing, the “Publication date” format remains.
 
 ```bash
-npm run migrate:post -- --token "<токен>" --chat-id 123456789 --dump telegram-dump
-# группа / чат с именами:
+npm run migrate:post -- --token "<token>" --chat-id 123456789 --dump telegram-dump
+# group / chat with names:
 npx tsx src/cli.ts post --token "$T" --chat-id "$MAX_CHAT_ID" --dump kids-dump --chat-author-mode
 ```
 
-Опции:
+Options:
 
-- `--chat-author-mode` — заголовок с автором и временем (см. выше)
-- `--skip-if-media-missing` — не отправлять посты, у которых не все вложения загружены
-- `--dry` — тестовый режим: полный текст и тело запроса `POST /messages` (включая массив `attachments` в формате API; если файл ещё не загружен — в `payload.token` показан плейсхолдер)
-- `--only-messages 3,7` — опубликовать **только** эти id; остальные не трогаются (`messagePosted` не меняется)
+- `--chat-author-mode` — header with author and time (see above)
+- `--skip-if-media-missing` — do not send posts whose attachments are not all uploaded
+- `--dry` — dry run: full text and `POST /messages` body (including `attachments` in API format; if a file is not uploaded yet, `payload.token` shows a placeholder)
+- `--only-messages 3,7` — publish **only** these IDs; others are untouched (`messagePosted` unchanged)
 
-При ошибке `attachment.not.ready` скрипт делает паузы и повторяет отправку. При **429** (слишком частая отправка в чат) — паузы **35–120 с** и до четырёх повторов. Между **успешными** сообщениями в чат по умолчанию пауза **2,5 с** (отдельный лимит Max); можно задать **`MAX_POST_MESSAGE_DELAY_MS`** (мс), например `4000` для более спокойного режима.
+On `attachment.not.ready` the script pauses and retries. On **429** (rate limit for the chat) — pauses **35–120 s** and up to four retries. Between **successful** messages to the chat the default pause is **2.5 s** (Max’s separate limit); set **`MAX_POST_MESSAGE_DELAY_MS`** (ms), e.g. `4000` for a gentler pace.
 
-### 3. `reattach` — добавить вложения к уже отправленному посту
+### 3. `reattach` — add attachments to an already posted message
 
-Если пост ушёл **без видео** (старая ошибка загрузки), а текст уже в чате: заново загрузите видео (`upload` + `--reset-failed` при необходимости), затем:
+If a post went out **without video** (old upload error) but the text is already in the chat: re-upload the video (`upload` + `--reset-failed` if needed), then:
 
 ```bash
 npx tsx src/cli.ts reattach --token "$T" --dump telegram-dump --only-messages 7
-# если посты с --chat-author-mode:
+# if posts used --chat-author-mode:
 npx tsx src/cli.ts reattach --token "$T" --dump kids-dump --only-messages 7 --chat-author-mode
 ```
 
-Если в `migration-state.json` нет **`maxMessageId`** (ответ API при `post` не распознан), укажите id сообщения в чате Max вручную:
+If `migration-state.json` has no **`maxMessageId`** (API response on `post` not recognized), pass the Max chat message ID manually:
 
 ```bash
 npx tsx src/cli.ts reattach --token "$T" --dump telegram-dump --only-messages 58 --mid "123456789"
 ```
 
-Команда вызывает **PUT** [`/messages`](https://dev.max.ru/docs-api/methods/PUT/messages) с тем же текстом и массивом `attachments`. Редактирование может быть ограничено по времени (например, 24 ч) — смотрите правила Max.
+The command calls **PUT** [`/messages`](https://dev.max.ru/docs-api/methods/PUT/messages) with the same text and `attachments` array. Editing may be time-limited (e.g. 24 h) — see Max’s rules.
 
-### 4. `sync-mids` — подставить `maxMessageId` из чата
+### 4. `sync-mids` — fill in `maxMessageId` from the chat
 
-Отдельного API «найти сообщение по тексту» в Max нет. Можно выгрузить историю чата через [**GET /messages**](https://dev.max.ru/docs-api/methods/GET/messages) (`chat_id`, окна `from`/`to`, до 100 сообщений за запрос) и **сопоставить** с записями в state по тексту (строка «Дата публикации: …» + совпадение слов).
+There is no separate “find message by text” API in Max. You can pull chat history via [**GET /messages**](https://dev.max.ru/docs-api/methods/GET/messages) (`chat_id`, `from`/`to` windows, up to 100 messages per request) and **match** state entries by text (line “Publication date: …” + word overlap).
 
 ```bash
 npx tsx src/cli.ts sync-mids --token "$T" --chat-id <id> --dump telegram-dump
 ```
 
-Опции: `--dry` (без записи), `--only-messages 58,60`, `--force` (перезаписать уже заданный mid), `--max-pages 500` (лимит пачек загрузки), **`--chat-author-mode`** (если постили с этим флагом).
+Options: `--dry` (no writes), `--only-messages 58,60`, `--force` (overwrite existing mid), `--max-pages 500` (batch fetch limit), **`--chat-author-mode`** (if you posted with this flag).
 
-После успешного `sync-mids` можно вызывать `reattach` без ручного `--mid`.
+After a successful `sync-mids` you can run `reattach` without manual `--mid`.
 
-## Состояние (`migration-state.json`)
+## State (`migration-state.json`)
 
-Для каждого `id` сообщения хранятся: ожидаемые файлы, результат загрузки (`token` / payload), флаг `messagePosted` и при необходимости `maxMessageId`.
+For each message `id` it stores: expected files, upload result (`token` / payload), `messagePosted` flag, and `maxMessageId` when available.
 
-## Почему не @maxhub/max-bot-api
+## Why not @maxhub/max-bot-api
 
-Библиотека [@maxhub/max-bot-api](https://github.com/max-messenger/max-bot-api-client-ts) рассчитана на **долгоживущего бота** (получение обновлений, `bot.on('message_created')`, `bot.start()`). Этот CLI делает разовую миграцию: чтение дампа → загрузка файлов → отправка сообщений. Токен и вызовы к `platform-api.max.ru` полностью контролируются кодом (повторы, лимиты RPS, атомарное состояние), без зависимости от слоя библиотеки. Для кросспостинга и миграции текущий подход удобнее.
+The [@maxhub/max-bot-api](https://github.com/max-messenger/max-bot-api-client-ts) library targets a **long-running bot** (updates, `bot.on('message_created')`, `bot.start()`). This CLI is a one-off migration: read dump → upload files → send messages. Token and calls to `platform-api.max.ru` are fully controlled in code (retries, RPS limits, atomic state) without the library layer. For cross-posting and migration this approach is more practical.
 
-## Документация Max
+## Max documentation
 
-- [Загрузка файлов](https://dev.max.ru/docs-api/methods/POST/uploads)
-- [Отправка сообщений](https://dev.max.ru/docs-api/methods/POST/messages)
+- [File uploads](https://dev.max.ru/docs-api/methods/POST/uploads)
+- [Send messages](https://dev.max.ru/docs-api/methods/POST/messages)
 
-## Тесты
+## Tests
 
 ```bash
 npm test
 ```
 
-## Расширение
+## Extending
 
-Источник сообщений вынесен в [`src/sources/telegram-dump.ts`](src/sources/telegram-dump.ts) (`loadTelegramDump`, `normalizeDumpMessage`). Позже можно добавить источник из Bot API Telegram с тем же нормализованным форматом сообщений.
+The message source lives in [`src/sources/telegram-dump.ts`](src/sources/telegram-dump.ts) (`loadTelegramDump`, `normalizeDumpMessage`). Later you can add a Telegram Bot API source with the same normalized message format.

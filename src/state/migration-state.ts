@@ -33,7 +33,7 @@ export function messageToStateEntry(msg: NormalizedMessage): MessageMigrationSta
   };
 }
 
-/** Слияние: сохраняем upload ok/error и messagePosted из существующего состояния */
+/** Merge: keep upload ok/error and messagePosted from existing state */
 export function mergeStateWithDump(
   existing: MigrationStateFile | null,
   dumpPath: string,
